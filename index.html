@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dino road</title>
+    <style type="text/css">
+        body {
+            background-color: rgb(255, 255, 255);
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #nivel {
+            font-size: 20px;
+            color: rgb(0, 0, 0);
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+
+
+        #contador {
+            font-size: 20px;
+            color: rgb(0, 0, 0);
+            position: absolute;
+            top: 40px;
+            left: 10px;
+        }
+
+        #controles {
+            font-size: 20px;
+            color: rgb(0, 0, 0);
+            position: absolute;
+            top: 70px;
+            left: 10px;
+        }
+
+        #timerDisplay {
+            font-size: 20px;
+            color: rgb(0, 0, 0);
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        #pauseOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 48px;
+        }
+
+        #gameOverOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 0, 0, 0.467);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 48px;
+            text-align: center;
+        }
+
+        canvas {
+            display: block;
+            background-color: lightgray;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="lienzo" width="1500" height="900"></canvas>
+    <div id="nivel"> nivel: 1</div>
+    <div id="contador">Llaves: 0 <br> <br> </div>
+    <div id="controles">Controles: <br> <br> W - Arriba <br> <br> S - Abajo <br> <br> A - Izquierda <br> <br> D -
+        Derecha <br><br> P - Pausa <br><br> M - Musica</div>
+    <div id="timerDisplay">Tiempo: 00:00</div>
+    <div id="pauseOverlay">Juego pausado.</div>
+    <div id="gameOverOverlay">¡Chale, perdiste! <br> Llaves recogidas: 0 <br> Presiona R para reiniciar.</div>
+
+    <script type="text/javascript">
+        const canvas = document.getElementById("lienzo");
+        const contexto = canvas.getContext("2d");
+        const contadorDiv = document.getElementById("contador");
+        const overlay = document.getElementById("pauseOverlay");
+        const musica = new Audio("zazaza.mp3");
+        musica.loop = true;
+        const sonidoColision = new Audio("bomba.m4a");
+        const fondo = new Image();
+        fondo.src = "fondo.jpg";
+        const gameOverOverlay = document.getElementById("gameOverOverlay");
+
+        const imagenes = {
+            arriba: "DinoArriba.png",
+            abajo: "DinoAbajo.png",
+            izquierda: "dinoIzquierda.png",
+            derecha: "dinoDerecha.png"
+        };
+
+        let imagenActual = new Image();
+        imagenActual.src = imagenes.abajo;
+        let time = 0;
+        let tiempoTranscurrido = 0;
+        let intervalID;
+        let posX = 700;
+        let posY = 850;
+        let direccion = "";
+        let velocidad = 5;
+        let puntos = 0;
+        let pause = false;
+        let gameOver = false;
+        let nivel = 1;
+        const incrementoVelocidad = 2;
+        const autoVelocidades = [10, 10, 10, 10];
+        let autos = [];
+        const llaveImg = new Image();
+        llaveImg.src = "llave.png";
+        let objetivoX = 300;
+        let objetivoY = 300;
+        const autoImg = new Image();
+        autoImg.src = "auto1.png";
+
+        const muros = [
+            { x: 1, y: 1, width: 15001, height: 5 },
+            { x: 43, y: 60, width: 120, height: 120 },
+            { x: 40, y: 280, width: 75, height: 65 },
+            { x: 685, y: 280, width: 75, height: 65 },
+            { x: 1395, y: 290, width: 60, height: 40 },
+            { x: 308, y: 420, width: 110, height: 97 },
+            { x: 1066, y: 420, width: 95, height: 97 },
+            { x: 90, y: 600, width: 50, height: 45 },
+            { x: 1310, y: 600, width: 72, height: 65 },
+            { x: 1250, y: 10, width: 225, height: 185 },
+            { x: 430, y: 90, width: 120, height: 65 },
+            { x: 1115, y: 80, width: 110, height: 65 },
+            { x: 1160, y: 80, width: 40, height: 105 }
+
+        ];
+
+        function crearAutos() {
+            autos = [
+                { x: canvas.width + 100, y: 200, width: 100, height: 60, speed: -autoVelocidades[0] },
+                { x: canvas.width + 300, y: 200, width: 100, height: 60, speed: -autoVelocidades[0] },
+                { x: canvas.width + 500, y: 200, width: 100, height: 60, speed: -autoVelocidades[0] },
+                { x: canvas.width + 700, y: 200, width: 100, height: 60, speed: -autoVelocidades[0] },
+                { x: canvas.width + 900, y: 200, width: 100, height: 60, speed: -autoVelocidades[0] },
+                { x: -100, y: 350, width: 100, height: 60, speed: autoVelocidades[1] },
+                { x: -300, y: 350, width: 100, height: 60, speed: autoVelocidades[1] },
+                { x: -500, y: 350, width: 100, height: 60, speed: autoVelocidades[1] },
+                { x: -700, y: 350, width: 100, height: 60, speed: autoVelocidades[1] },
+                { x: -900, y: 350, width: 100, height: 60, speed: autoVelocidades[1] },
+                { x: canvas.width + 100, y: 510, width: 100, height: 60, speed: -autoVelocidades[2] },
+                { x: canvas.width + 300, y: 510, width: 100, height: 60, speed: -autoVelocidades[2] },
+                { x: canvas.width + 500, y: 510, width: 100, height: 60, speed: -autoVelocidades[2] },
+                { x: canvas.width + 700, y: 510, width: 100, height: 60, speed: -autoVelocidades[2] },
+                { x: canvas.width + 900, y: 510, width: 100, height: 60, speed: -autoVelocidades[2] },
+                { x: -100, y: 650, width: 100, height: 60, speed: autoVelocidades[3] },
+                { x: -300, y: 650, width: 100, height: 60, speed: autoVelocidades[3] },
+                { x: -500, y: 650, width: 100, height: 60, speed: autoVelocidades[3] },
+                { x: -700, y: 650, width: 100, height: 60, speed: autoVelocidades[3] },
+                { x: -900, y: 650, width: 100, height: 60, speed: autoVelocidades[3] },
+            ];
+        }
+
+        function moverAutos() {
+            autos.forEach(auto => {
+                auto.x += auto.speed;
+                if (auto.speed > 0 && auto.x > canvas.width) {
+                    auto.x = -auto.width;
+                } else if (auto.speed < 0 && auto.x < -auto.width) {
+                    auto.x = canvas.width;
+                }
+            });
+        }
+
+        function detectarColisionConAutos() {
+            if (autos.some(auto =>
+                posX < auto.x + auto.width &&
+                posX + 50 > auto.x &&
+                posY < auto.y + auto.height &&
+                posY + 50 > auto.y
+            )) {
+                sonidoColision.play();
+                gameOver = true;
+                musica.pause();
+                gameOverOverlay.style.display = "flex";
+                gameOverOverlay.innerHTML = "¡Chale, perdiste! <br> Llaves recogidas: " + puntos + "<br> Nivel alcanzado: "+ nivel +"<br>  Reinicia para volver a jugar";
+                stopTimer();
+                return true;
+            }
+            return false;
+        }
+
+        function detectarColisionConMuros(x, y, width, height) {
+            return muros.some(muro =>
+                x < muro.x + muro.width &&
+                x + width > muro.x &&
+                y < muro.y + muro.height &&
+                y + height > muro.y
+            );
+        }
+
+        function obtenerPosicionAleatoria() {
+            let pos;
+            do {
+                pos = {
+                    x: Math.random() * (canvas.width - 20),
+                    y: Math.random() * (canvas.height - 20)
+                };
+            } while (detectarColisionConAutos(pos.x, pos.y, 15, 15) || detectarColisionConMuros(pos.x, pos.y, 30, 30));
+            return pos;
+        }
+
+        function detectarColisionConObjetivo() {
+            if (
+                posX < objetivoX + 30 &&
+                posX + 50 > objetivoX &&
+                posY < objetivoY + 30 &&
+                posY + 50 > objetivoY
+            ) {
+                puntos = puntos + 1;
+                contadorDiv.textContent = "Llaves: " + puntos;
+                if (puntos % 5 === 0) {
+                    muros.splice(0, 1);
+                }
+
+                if (puntos <= 5) {
+                    let nuevaPos = obtenerPosicionAleatoria();
+                    objetivoX = nuevaPos.x;
+                    objetivoY = nuevaPos.y;
+                }
+            }
+        }
+
+        function startTimer() {
+            intervalID = setInterval(function () {
+                tiempoTranscurrido++;
+                actualizarTemporizador();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(intervalID);
+        }
+
+        function actualizarTemporizador() {
+            const minutos = Math.floor(tiempoTranscurrido / 60);
+            const segundos = tiempoTranscurrido % 60;
+            const minutosStr = minutos < 10 ? "0" + minutos : minutos;
+            const segundosStr = segundos < 10 ? "0" + segundos : segundos;
+            document.getElementById("timerDisplay").innerText = "Tiempo: " + minutosStr + ":" + segundosStr;
+        }
+
+        function actualizar() {
+            let nuevaPosX = posX;
+            let nuevaPosY = posY;
+
+            if (!pause && !gameOver) {
+                switch (direccion) {
+                    case "arriba":
+                        nuevaPosY -= velocidad;
+                        if (nuevaPosY < 0) {
+                            nuevaPosY = canvas.height;
+                            nivel++;
+                            document.getElementById("nivel").textContent = "Nivel: " + nivel;
+                            autos.forEach(auto => {
+                                auto.speed += incrementoVelocidad;
+                            });
+
+                            if (!muros.some(muro => muro.y === 1)) {
+                                muros.unshift({ x: 1, y: 1, width: 15001, height: 10 });
+                                puntos = 0;
+                                let contadorDiv = document.getElementById("contador");
+                                contadorDiv.textContent = "Llaves: " + puntos;
+                                contexto.drawImage(llaveImg, objetivoX, objetivoY, 30, 30);
+                            }
+                        }
+                        break;
+                    case "abajo":
+                        nuevaPosY += velocidad;
+                        if (nuevaPosY + 50 > canvas.height) {
+                            nuevaPosY = canvas.height - 50;
+                        }
+                        break;
+                    case "izquierda":
+                        nuevaPosX -= velocidad;
+                        if (nuevaPosX < 0) {
+                            nuevaPosX = 0;
+                        }
+                        break;
+                    case "derecha":
+                        nuevaPosX += velocidad;
+                        if (nuevaPosX + 50 > canvas.width) {
+                            nuevaPosX = canvas.width - 50;
+                        }
+                        break;
+                }
+
+                if (!detectarColisionConMuros(nuevaPosX, nuevaPosY, 50, 50)) {
+                    posX = nuevaPosX;
+                    posY = nuevaPosY;
+                }
+
+                if (detectarColisionConAutos()) {
+                    sonidoColision.play();
+                    gameOver = true;
+                    musica.pause();
+                    reiniciarJuego();
+                }
+
+                detectarColisionConObjetivo();
+                moverAutos();
+            }
+
+            dibujar();
+            requestAnimationFrame(actualizar);
+        }
+
+        function dibujar() {
+            contexto.clearRect(0, 0, canvas.width, canvas.height);
+            contexto.drawImage(fondo, 0, 0, canvas.width, canvas.height);
+            contexto.drawImage(imagenActual, posX, posY, 50, 50);
+            autos.forEach(auto => {
+                contexto.drawImage(autoImg, auto.x, auto.y, auto.width, auto.height);
+            });
+            if (puntos < 5) {
+                contexto.drawImage(llaveImg, objetivoX, objetivoY, 30, 30);
+            }
+
+            contexto.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            // Mostrar solo el primer muro
+            if (muros.length > 0) {
+                const primerMuro = muros[0];
+                contexto.fillRect(primerMuro.x, primerMuro.y, primerMuro.width, primerMuro.height);
+            }
+        }
+
+        function detenerJuego() {
+            musica.pause();
+            gameOver = true;
+            if (intervalID) {
+                clearInterval(intervalID);
+            }
+            cancelAnimationFrame(update);
+        }
+
+        function reiniciarJuego() {
+            tiempoTranscurrido = 0;
+            contadorDiv.innerHTML = "Llaves: 0";
+            posX = 700;
+            posY = 850;
+            crearAutos();
+            if (intervalID) {
+                clearInterval(intervalID);
+            }
+            musica.paused
+            intervaloTemporizador();
+            gameOver = false;
+            pause = false;
+            overlay.style.display = "none";
+            requestAnimationFrame(update);
+        }
+
+        function mostrarGameOver() {
+            gameOverOverlay.style.display = "flex";
+            detenerJuego();
+        }
+
+        window.addEventListener("keydown", function (evento) {
+            if (gameOver && (evento.key === "r" || evento.key === "R")) {
+                reiniciarJuego();
+                return;
+            }
+
+            switch (evento.key) {
+                case "w":
+                    direccion = "arriba";
+                    imagenActual.src = imagenes.arriba;
+                    break;
+                case "s":
+                    direccion = "abajo";
+                    imagenActual.src = imagenes.abajo;
+                    break;
+                case "a":
+                    direccion = "izquierda";
+                    imagenActual.src = imagenes.izquierda;
+                    break;
+                case "d":
+                    direccion = "derecha";
+                    imagenActual.src = imagenes.derecha;
+                    break;
+                case "p":
+                    controlPause();
+                    break;
+                case "m":
+                    musica.play();
+                    break;
+            }
+        });
+
+        window.addEventListener("keyup", (e) => {
+            if (event.key === "ArrowUp" || event.key === "w" ||
+                event.key === "ArrowDown" || event.key === "s" ||
+                event.key === "ArrowLeft" || event.key === "a" ||
+                event.key === "ArrowRight" || event.key === "d")
+                direccion = "";
+        });
+
+        function controlPause() {
+            pause = !pause;
+            if (pause) {
+                overlay.style.display = "flex";
+                musica.pause();
+                stopTimer();
+            } else {
+                overlay.style.display = "none";
+                musica.play();
+                startTimer();
+            }
+        }
+
+        fondo.onload = function () {
+            crearAutos();
+            musica.play();
+            startTimer();
+            actualizar();
+        };
+
+    </script>
+</body>
+
+</html>
